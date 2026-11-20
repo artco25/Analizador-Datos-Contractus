@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Analizador Datos Contractus — Cruce FCM</title>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+  <style>
+    :root {
+      --bg: #0b1120;
+      --card: #111827;
+      --border: #1f2937;
+      --text: #f3f4f6;
+      --muted: #9ca3af;
+      --accent: #06b6d4;
+      --accent-hover: #0891b2;
+    }
+    * { box-sizing: border-box; font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif; }
+    body { margin: 0; background: var(--bg); color: var(--text); padding: 2rem 1rem; }
+    .container { max-width: 1180px; margin: 0 auto; }
+    h1 { font-size: 1.65rem; margin: 0 0 0.4rem; }
+    p.sub { color: var(--muted); margin: 0 0 1.75rem; font-size: 0.95rem; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.2rem; }
+    label { display: block; font-weight: 600; margin-bottom: 0.5rem; font-size: 0.92rem; }
+    small { display: block; color: var(--muted); margin-top: 0.4rem; font-size: 0.8rem; }
+    input[type="file"], select {
+      width: 100%; background: #0f172a; color: var(--text);
+      border: 1px solid #334155; border-radius: 8px; padding: 0.55rem; font-size: 0.88rem;
+    }
+    .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin: 1.5rem 0; }
+    .metric { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 1rem; }
+    .metric span { display: block; color: var(--muted); font-size: 0.8rem; }
+    .metric strong { font-size: 1.4rem; color: var(--accent); }
+    button {
+      background: var(--accent); color: #042f2e; font-weight: 700; border: none;
+      padding: 0.75rem 1.3rem; border-radius: 8px; cursor: pointer; font-size: 0.95rem;
+    }
+    button:hover { background: var(--accent-hover); color: #fff; }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+    .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; margin-top: 1rem; max-height: 440px; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.83rem; }
+    th, td { padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--border); text-align: left; white-space: nowrap; }
+    th { background: #0f172a; position: sticky; top: 0; color: var(--accent); }
+    .error { color: #f87171; background: rgba(248,113,113,0.1); border: 1px solid #7f1d1d; padding: 0.8rem; border-radius: 8px; margin-top: 1rem; }
+    footer { margin-top: 2.5rem; color: var(--muted); font-size: 0.8rem; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Analizador de Datos Contractus — Cruce FCM</h1>
+    <p class="sub">Filtra registros en <strong>REPORTE FCM (hoja MANDAMIENTO)</strong> cuya <strong>Identificación / Cédula</strong> no aparezca en Sanciones ni Cobro Coactivo.</p>
+
+    <div class="grid">
+      <div class="card">
+        <label for="fcmFile">1. Reporte FCM (.xlsx)</label>
+        <input type="file" id="fcmFile" accept=".xlsx,.xls" />
+        <small>Usa la hoja <b>MANDAMIENTO</b> y la columna <b>Identificación</b>.</small>
+      </div>
+      <div class="card">
+        <label for="sancFile">2. Sanciones pendientes firma (.xlsx)</label>
+        <input type="file" id="sancFile" accept=".xlsx,.xls" />
+        <small>Usa la columna <b>Cédula</b>.</small>
+      </div>
+      <div class="card">
+        <label for="cobroFile">3. Cobro coactivo pendientes firma (.xlsx)</label>
+        <input type="file" id="cobroFile" accept=".xlsx,.xls" />
+        <small>Usa la columna <b>Cédula</b>.</small>
+      </div>
+    </div>
+
+    <div id="sheetSelectorBox" class="card" style="display:none; margin-bottom: 1rem;">
+      <label for="sheetSelect">Hoja a analizar en REPORTE FCM:</label>
+      <select id="sheetSelect"></select>
+    </div>
+
+    <div id="errorBox" class="error" style="display:none;"></div>
+
+    <div id="resultsBox" style="display:none;">
+      <div class="metrics">
+        <div class="metric"><span>Total FCM (MANDAMIENTO)</span><strong id="mTotalFcm">0</strong></div>
+        <div class="metric"><span>Cédulas en Sanciones</span><strong id="mSanc">0</strong></div>
+        <div class="metric"><span>Cédulas en Cobro Coactivo</span><strong id="mCobro">0</strong></div>
+        <div class="metric"><span>Exclusivos en FCM</span><strong id="mExcl">0</strong></div>
+      </div>
+
+      <button id="downloadBtn">Descargar resultado en Excel (.xlsx)</button>
+
+      <div class="table-wrap">
+        <table id="previewTable"></table>
+      </div>
+    </div>
+
+    <footer>Desarrollado por Roberto José Molina González — Ingeniería de Sistemas & Arquitectura de Software</footer>
+  </div>
+
+  <script>
+    let wbFcm = null, wbSanc = null, wbCobro = null, resultadoGlobal = [];
+
+    function normalizarCC(val) {
+      if (val === null || val === undefined) return "";
+      return String(val)
+        .replace(/'/g, "")
+        .replace(/\.0$/, "")
+        .trim()
+        .replace(/^0+/, "");
+    }
+
+    function leerWorkbook(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            const wb = XLSX.read(e.target.result, { type: "array", cellDates: true });
+            resolve(wb);
+          } catch (err) {
+            reject(err);
+          }
+        };
+        reader.onerror = reject;
+        reader.readAsArrayBuffer(file);
+      });
+    }
+
+    function mostrarError(msg) {
+      const box = document.getElementById("errorBox");
+      if (!msg) { box.style.display = "none"; return; }
+      box.textContent = msg;
+      box.style.display = "block";
+      document.getElementById("resultsBox").style.display = "none";
+    }
+
+    function ejecutarCruce() {
+      mostrarError("");
+      if (!wbFcm || !wbSanc || !wbCobro) return;
+
+      const sheetName = document.getElementById("sheetSelect").value;
+      const rowsFcm = XLSX.utils.sheet_to_json(wbFcm.Sheets[sheetName], { defval: "" });
+      const rowsSanc = XLSX.utils.sheet_to_json(wbSanc.Sheets[wbSanc.SheetNames[0]], { defval: "" });
+      const rowsCobro = XLSX.utils.sheet_to_json(wbCobro.Sheets[wbCobro.SheetNames[0]], { defval: "" });
+
+      if (rowsFcm.length && !("Identificación" in rowsFcm[0])) {
+        return mostrarError(`La hoja "${sheetName}" no contiene la columna "Identificación".`);
+      }
+      if (rowsSanc.length && !("Cédula" in rowsSanc[0])) {
+        return mostrarError('El archivo de Sanciones no contiene la columna "Cédula".');
+      }
+      if (rowsCobro.length && !("Cédula" in rowsCobro[0])) {
+        return mostrarError('El archivo de Cobro Coactivo no contiene la columna "Cédula".');
+      }
+
+      const ccSanc = new Set(rowsSanc.map(r => normalizarCC(r["Cédula"])).filter(Boolean));
+      const ccCobro = new Set(rowsCobro.map(r => normalizarCC(r["Cédula"])).filter(Boolean));
+      const excluir = new Set([...ccSanc, ...ccCobro]);
+
+      resultadoGlobal = rowsFcm.filter(r => {
+        const cc = normalizarCC(r["Identificación"]);
+        return !excluir.has(cc);
+      });
+
+      const ccUnicas = new Set(resultadoGlobal.map(r => normalizarCC(r["Identificación"])).filter(Boolean));
+
+      document.getElementById("mTotalFcm").textContent = rowsFcm.length;
+      document.getElementById("mSanc").textContent = ccSanc.size;
+      document.getElementById("mCobro").textContent = ccCobro.size;
+      document.getElementById("mExcl").textContent = `${resultadoGlobal.length} filas (${ccUnicas.size} CC)`;
+
+      renderTabla(resultadoGlobal);
+      document.getElementById("resultsBox").style.display = "block";
+    }
+
+    function renderTabla(rows) {
+      const table = document.getElementById("previewTable");
+      if (!rows.length) {
+        table.innerHTML = "<tr><td>Sin registros exclusivos en FCM.</td></tr>";
+        return;
+      }
+      const cols = Object.keys(rows[0]);
+      const thead = `<thead><tr>${cols.map(c => `<th>${c}</th>`).join("")}</tr></thead>`;
+      const tbody = `<tbody>${rows.map(r => `<tr>${cols.map(c => {
+        let v = r[c];
+        if (v instanceof Date) v = v.toISOString().split("T")[0];
+        return `<td>${v ?? ""}</td>`;
+      }).join("")}</tr>`).join("")}</tbody>`;
+      table.innerHTML = thead + tbody;
+    }
+
+    document.getElementById("fcmFile").addEventListener("change", async (e) => {
+      if (!e.target.files[0]) return;
+      wbFcm = await leerWorkbook(e.target.files[0]);
+      const sel = document.getElementById("sheetSelect");
+      sel.innerHTML = wbFcm.SheetNames.map(s => `<option value="${s}" ${s === "MANDAMIENTO" ? "selected" : ""}>${s}</option>`).join("");
+      document.getElementById("sheetSelectorBox").style.display = "block";
+      ejecutarCruce();
+    });
+
+    document.getElementById("sancFile").addEventListener("change", async (e) => {
+      if (!e.target.files[0]) return;
+      wbSanc = await leerWorkbook(e.target.files[0]);
+      ejecutarCruce();
+    });
+
+    document.getElementById("cobroFile").addEventListener("change", async (e) => {
+      if (!e.target.files[0]) return;
+      wbCobro = await leerWorkbook(e.target.files[0]);
+      ejecutarCruce();
+    });
+
+    document.getElementById("sheetSelect").addEventListener("change", ejecutarCruce);
+
+    document.getElementById("downloadBtn").addEventListener("click", () => {
+      const ws = XLSX.utils.json_to_sheet(resultadoGlobal);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "SOLO_EN_FCM");
+      XLSX.writeFile(wb, "fcm_no_en_pendientes.xlsx");
+    });
+  </script>
+</body>
+</html>
