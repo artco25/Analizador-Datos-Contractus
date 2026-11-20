@@ -3,88 +3,164 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Analizador Datos Contractus — Cruce FCM</title>
+  <title>Analizador Datos Contractus — Cruce y Limpieza FCM</title>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
   <style>
     :root {
       --bg: #0b1120;
       --card: #111827;
+      --card-2: #0f172a;
       --border: #1f2937;
       --text: #f3f4f6;
       --muted: #9ca3af;
       --accent: #06b6d4;
       --accent-hover: #0891b2;
+      --ok: #10b981;
+      --warn: #f59e0b;
     }
     * { box-sizing: border-box; font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif; }
     body { margin: 0; background: var(--bg); color: var(--text); padding: 2rem 1rem; }
-    .container { max-width: 1180px; margin: 0 auto; }
-    h1 { font-size: 1.65rem; margin: 0 0 0.4rem; }
-    p.sub { color: var(--muted); margin: 0 0 1.75rem; font-size: 0.95rem; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
-    .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.2rem; }
-    label { display: block; font-weight: 600; margin-bottom: 0.5rem; font-size: 0.92rem; }
-    small { display: block; color: var(--muted); margin-top: 0.4rem; font-size: 0.8rem; }
-    input[type="file"], select {
-      width: 100%; background: #0f172a; color: var(--text);
-      border: 1px solid #334155; border-radius: 8px; padding: 0.55rem; font-size: 0.88rem;
+    .container { max-width: 1280px; margin: 0 auto; }
+    h1 { font-size: 1.65rem; margin: 0 0 0.35rem; }
+    p.sub { color: var(--muted); margin: 0 0 1.5rem; font-size: 0.94rem; }
+
+    .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 1rem; margin-bottom: 1.2rem; }
+    .grid-4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1.2rem; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.1rem; }
+    .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
+    label { font-weight: 600; font-size: 0.9rem; display: block; margin-bottom: 0.4rem; }
+    .badge { font-size: 0.72rem; padding: 0.15rem 0.5rem; border-radius: 999px; font-weight: 600; }
+    .badge-req { background: rgba(6,182,212,0.15); color: var(--accent); }
+    .badge-opt { background: rgba(156,163,175,0.15); color: var(--muted); }
+    .badge-loaded { background: rgba(16,185,129,0.18); color: var(--ok); }
+
+    small { display: block; color: var(--muted); margin-top: 0.4rem; font-size: 0.79rem; }
+    input[type="file"], input[type="text"], select {
+      width: 100%; background: var(--card-2); color: var(--text);
+      border: 1px solid #334155; border-radius: 8px; padding: 0.55rem 0.7rem; font-size: 0.87rem;
     }
-    .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin: 1.5rem 0; }
-    .metric { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 1rem; }
-    .metric span { display: block; color: var(--muted); font-size: 0.8rem; }
-    .metric strong { font-size: 1.4rem; color: var(--accent); }
+
+    .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(175px, 1fr)); gap: 0.9rem; margin: 1.2rem 0; }
+    .metric { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 0.95rem; }
+    .metric span { display: block; color: var(--muted); font-size: 0.78rem; }
+    .metric strong { font-size: 1.35rem; color: var(--accent); }
+
+    .actions { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; margin: 1rem 0; }
     button {
       background: var(--accent); color: #042f2e; font-weight: 700; border: none;
-      padding: 0.75rem 1.3rem; border-radius: 8px; cursor: pointer; font-size: 0.95rem;
+      padding: 0.7rem 1.2rem; border-radius: 8px; cursor: pointer; font-size: 0.9rem;
     }
     button:hover { background: var(--accent-hover); color: #fff; }
-    button:disabled { opacity: 0.4; cursor: not-allowed; }
-    .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; margin-top: 1rem; max-height: 440px; }
-    table { width: 100%; border-collapse: collapse; font-size: 0.83rem; }
-    th, td { padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--border); text-align: left; white-space: nowrap; }
-    th { background: #0f172a; position: sticky; top: 0; color: var(--accent); }
-    .error { color: #f87171; background: rgba(248,113,113,0.1); border: 1px solid #7f1d1d; padding: 0.8rem; border-radius: 8px; margin-top: 1rem; }
+    button.secondary { background: #1e293b; color: var(--text); border: 1px solid #334155; }
+    button.secondary:hover { background: #334155; }
+
+    .table-wrap { overflow: auto; border: 1px solid var(--border); border-radius: 10px; max-height: 460px; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    th, td { padding: 0.55rem 0.75rem; border-bottom: 1px solid var(--border); text-align: left; white-space: nowrap; }
+    th { background: var(--card-2); position: sticky; top: 0; color: var(--accent); z-index: 1; }
+    tr:hover td { background: rgba(255,255,255,0.02); }
+
+    .error { color: #f87171; background: rgba(248,113,113,0.1); border: 1px solid #7f1d1d; padding: 0.8rem; border-radius: 8px; margin-bottom: 1rem; }
     footer { margin-top: 2.5rem; color: var(--muted); font-size: 0.8rem; text-align: center; }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>Analizador de Datos Contractus — Cruce FCM</h1>
-    <p class="sub">Filtra registros en <strong>REPORTE FCM (hoja MANDAMIENTO)</strong> cuya <strong>Identificación / Cédula</strong> no aparezca en Sanciones ni Cobro Coactivo.</p>
+    <h1>Analizador de Datos Contractus — Limpieza y Cruce Dinámico</h1>
+    <p class="sub">Limpia automáticamente apóstrofes, caracteres corruptos (<code>CÃ©dula</code> &rarr; <code>Cédula</code>) y cruza reportes aunque omitas alguno de los archivos secundarios.</p>
 
-    <div class="grid">
+    <!-- CARGA DE ARCHIVOS -->
+    <div class="grid-3">
       <div class="card">
-        <label for="fcmFile">1. Reporte FCM (.xlsx)</label>
+        <div class="card-header">
+          <label for="fcmFile" style="margin:0;">1. Archivo Principal (REPORTE FCM)</label>
+          <span class="badge badge-req" id="statusFcm">Obligatorio</span>
+        </div>
         <input type="file" id="fcmFile" accept=".xlsx,.xls" />
-        <small>Usa la hoja <b>MANDAMIENTO</b> y la columna <b>Identificación</b>.</small>
+        <small>Por defecto selecciona la hoja <b>MANDAMIENTO</b>, pero puedes cambiarla.</small>
       </div>
+
       <div class="card">
-        <label for="sancFile">2. Sanciones pendientes firma (.xlsx)</label>
+        <div class="card-header">
+          <label for="sancFile" style="margin:0;">2. Sanciones Pendientes Firma</label>
+          <span class="badge badge-opt" id="statusSanc">Opcional</span>
+        </div>
         <input type="file" id="sancFile" accept=".xlsx,.xls" />
-        <small>Usa la columna <b>Cédula</b>.</small>
+        <small>Si no lo subes, se omite en el cruce sin bloquear el reporte.</small>
       </div>
+
       <div class="card">
-        <label for="cobroFile">3. Cobro coactivo pendientes firma (.xlsx)</label>
+        <div class="card-header">
+          <label for="cobroFile" style="margin:0;">3. Cobro Coactivo Pendientes Firma</label>
+          <span class="badge badge-opt" id="statusCobro">Opcional</span>
+        </div>
         <input type="file" id="cobroFile" accept=".xlsx,.xls" />
-        <small>Usa la columna <b>Cédula</b>.</small>
+        <small>Si no lo subes, compara solo contra los archivos cargados.</small>
       </div>
     </div>
 
-    <div id="sheetSelectorBox" class="card" style="display:none; margin-bottom: 1rem;">
-      <label for="sheetSelect">Hoja a analizar en REPORTE FCM:</label>
-      <select id="sheetSelect"></select>
+    <!-- CONTROLES DINÁMICOS -->
+    <div id="controlsPanel" class="card" style="display:none; margin-bottom: 1.2rem;">
+      <div class="grid-4" style="margin-bottom:0.6rem;">
+        <div>
+          <label for="sheetSelect">Hoja de REPORTE FCM</label>
+          <select id="sheetSelect"></select>
+        </div>
+
+        <div>
+          <label for="keySelect">Llave de cruce</label>
+          <select id="keySelect">
+            <option value="cc">Cédula / Identificación</option>
+            <option value="comparendo">Número de Comparendo</option>
+            <option value="resolucion">Número de Resolución</option>
+          </select>
+        </div>
+
+        <div>
+          <label for="modeSelect">Tipo de reporte a generar</label>
+          <select id="modeSelect">
+            <option value="exclusivos">Exclusivos en FCM (no están en los demás)</option>
+            <option value="coincidencias">Coincidencias (están en FCM y en los demás)</option>
+            <option value="solo_vs_sanc">En FCM pero NO en Sanciones</option>
+            <option value="solo_vs_cobro">En FCM pero NO en Cobro Coactivo</option>
+            <option value="consolidado">Consolidado completo (con columnas de cruce)</option>
+          </select>
+        </div>
+
+        <div>
+          <label for="searchInput">Filtro rápido en tabla</label>
+          <input type="text" id="searchInput" placeholder="Buscar cédula, nombre, OK, RS-..." />
+        </div>
+      </div>
+
+      <div style="display:flex; gap:1.2rem; flex-wrap:wrap; align-items:center; font-size:0.84rem; color:var(--muted);">
+        <label style="display:inline-flex; align-items:center; gap:0.4rem; margin:0; cursor:pointer;">
+          <input type="checkbox" id="chkCleanData" checked /> Limpiar texto corrupto (CÃ©dula, apóstrofes, espacios)
+        </label>
+        <label style="display:inline-flex; align-items:center; gap:0.4rem; margin:0; cursor:pointer;">
+          <input type="checkbox" id="chkDedup" /> Eliminar filas duplicadas por llave
+        </label>
+        <button class="secondary" id="clearSecondaryBtn" style="padding:0.35rem 0.75rem; font-size:0.8rem; margin-left:auto;">
+          Limpiar archivos opcionales
+        </button>
+      </div>
     </div>
 
     <div id="errorBox" class="error" style="display:none;"></div>
 
+    <!-- RESULTADOS -->
     <div id="resultsBox" style="display:none;">
       <div class="metrics">
-        <div class="metric"><span>Total FCM (MANDAMIENTO)</span><strong id="mTotalFcm">0</strong></div>
-        <div class="metric"><span>Cédulas en Sanciones</span><strong id="mSanc">0</strong></div>
-        <div class="metric"><span>Cédulas en Cobro Coactivo</span><strong id="mCobro">0</strong></div>
-        <div class="metric"><span>Exclusivos en FCM</span><strong id="mExcl">0</strong></div>
+        <div class="metric"><span>Registros Base (FCM)</span><strong id="mTotalFcm">0</strong></div>
+        <div class="metric"><span>Llaves en Sanciones</span><strong id="mSanc">0</strong></div>
+        <div class="metric"><span>Llaves en Cobro Coactivo</span><strong id="mCobro">0</strong></div>
+        <div class="metric"><span>Filas en Reporte Actual</span><strong id="mResult">0</strong></div>
       </div>
 
-      <button id="downloadBtn">Descargar resultado en Excel (.xlsx)</button>
+      <div class="actions">
+        <button id="downloadBtn">Descargar Reporte Actual (.xlsx)</button>
+        <button class="secondary" id="downloadMultiBtn">Descargar Excel Multi-Hoja (Todos los Cruces)</button>
+      </div>
 
       <div class="table-wrap">
         <table id="previewTable"></table>
@@ -95,15 +171,48 @@
   </div>
 
   <script>
-    let wbFcm = null, wbSanc = null, wbCobro = null, resultadoGlobal = [];
+    let wbFcm = null, wbSanc = null, wbCobro = null;
+    let vistaActual = [];
+    let reportesCalculados = {};
 
-    function normalizarCC(val) {
+    // 1. Limpieza de codificación UTF-8 mal decodificada como Latin-1 (Mojibake) y apóstrofes
+    function limpiarTexto(val, aplicarLimpieza = true) {
       if (val === null || val === undefined) return "";
-      return String(val)
-        .replace(/'/g, "")
+      if (val instanceof Date) {
+        if (isNaN(val.getTime())) return "";
+        return val.toISOString().split("T")[0];
+      }
+      let str = String(val);
+      if (!aplicarLimpieza) return str;
+
+      // Reparar Mojibake común (CÃ©dula -> Cédula, MUÃ‘OZ -> MUÑOZ, ProtecciÃ³ -> Protección)
+      try {
+        if (/[ÃÂ]/.test(str)) {
+          str = decodeURIComponent(escape(str));
+        }
+      } catch (_) {
+        str = str
+          .replace(/CÃ©dula/g, "Cédula")
+          .replace(/ProtecciÃ³/g, "Protección")
+          .replace(/Ã‘/g, "Ñ")
+          .replace(/Ã±/g, "ñ")
+          .replace(/Ã¡/g, "á")
+          .replace(/Ã©/g, "é")
+          .replace(/Ã­/g, "í")
+          .replace(/Ã³/g, "ó")
+          .replace(/Ãº/g, "ú");
+      }
+
+      // Quitar apóstrofe inicial de Excel ('RS-1628-2022 -> RS-1628-2022) y espacios múltiples
+      return str.replace(/^'+/, "").replace(/\s+/g, " ").trim();
+    }
+
+    function normalizarLlave(val) {
+      return limpiarTexto(val, true)
         .replace(/\.0$/, "")
-        .trim()
-        .replace(/^0+/, "");
+        .replace(/\s+/g, "")
+        .replace(/^0+/, "")
+        .toUpperCase();
     }
 
     function leerWorkbook(file) {
@@ -111,8 +220,7 @@
         const reader = new FileReader();
         reader.onload = (e) => {
           try {
-            const wb = XLSX.read(e.target.result, { type: "array", cellDates: true });
-            resolve(wb);
+            resolve(XLSX.read(e.target.result, { type: "array", cellDates: true }));
           } catch (err) {
             reject(err);
           }
@@ -120,6 +228,56 @@
         reader.onerror = reject;
         reader.readAsArrayBuffer(file);
       });
+    }
+
+    // Extrae filas detectando automáticamente si el encabezado real está en fila 0 o fila 4 (ej. hojas FCM con título)
+    function extraerFilasLimpias(sheet, aplicarLimpieza) {
+      const matriz = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+      if (!matriz.length) return [];
+
+      let headerIdx = 0;
+      for (let i = 0; i < Math.min(10, matriz.length); i++) {
+        const filaStr = matriz[i].map(c => limpiarTexto(c, true).toLowerCase());
+        if (filaStr.some(c => c.includes("identificación") || c === "cédula" || c.includes("cédula infractor") || c.includes("nro comparendo"))) {
+          headerIdx = i;
+          break;
+        }
+      }
+
+      const rawHeaders = matriz[headerIdx];
+      const headers = rawHeaders.map((h, idx) => {
+        let cleanH = limpiarTexto(h, aplicarLimpieza);
+        if (cleanH.toUpperCase() === "MADAMIENTO") cleanH = "MANDAMIENTO";
+        return cleanH || `Columna_${idx + 1}`;
+      });
+
+      const filas = [];
+      for (let r = headerIdx + 1; r < matriz.length; r++) {
+        const rowArr = matriz[r];
+        if (!rowArr || rowArr.every(cell => cell === "" || cell === null || cell === undefined)) continue;
+        const obj = {};
+        headers.forEach((h, idx) => {
+          obj[h] = limpiarTexto(rowArr[idx], aplicarLimpieza);
+        });
+        filas.push(obj);
+      }
+      return filas;
+    }
+
+    // Encuentra la columna correspondiente según la llave seleccionada
+    function obtenerValorLlave(row, tipoLlave) {
+      const keys = Object.keys(row);
+      const candidatos = {
+        cc: ["identificación", "cédula", "cedula", "cédula infractor"],
+        comparendo: ["número comparendo", "comparendo", "nro comparendo"],
+        resolucion: ["número resolución", "resolución", "resolucion", "nro resolución"]
+      }[tipoLlave] || [];
+
+      for (const c of candidatos) {
+        const found = keys.find(k => k.toLowerCase().trim() === c);
+        if (found) return row[found];
+      }
+      return "";
     }
 
     function mostrarError(msg) {
@@ -130,89 +288,172 @@
       document.getElementById("resultsBox").style.display = "none";
     }
 
-    function ejecutarCruce() {
+    function procesarTodo() {
       mostrarError("");
-      if (!wbFcm || !wbSanc || !wbCobro) return;
+      if (!wbFcm) return;
 
+      const aplicarLimpieza = document.getElementById("chkCleanData").checked;
+      const deduplicar = document.getElementById("chkDedup").checked;
+      const tipoLlave = document.getElementById("keySelect").value;
+      const modo = document.getElementById("modeSelect").value;
       const sheetName = document.getElementById("sheetSelect").value;
-      const rowsFcm = XLSX.utils.sheet_to_json(wbFcm.Sheets[sheetName], { defval: "" });
-      const rowsSanc = XLSX.utils.sheet_to_json(wbSanc.Sheets[wbSanc.SheetNames[0]], { defval: "" });
-      const rowsCobro = XLSX.utils.sheet_to_json(wbCobro.Sheets[wbCobro.SheetNames[0]], { defval: "" });
 
-      if (rowsFcm.length && !("Identificación" in rowsFcm[0])) {
-        return mostrarError(`La hoja "${sheetName}" no contiene la columna "Identificación".`);
-      }
-      if (rowsSanc.length && !("Cédula" in rowsSanc[0])) {
-        return mostrarError('El archivo de Sanciones no contiene la columna "Cédula".');
-      }
-      if (rowsCobro.length && !("Cédula" in rowsCobro[0])) {
-        return mostrarError('El archivo de Cobro Coactivo no contiene la columna "Cédula".');
+      let rowsFcm = extraerFilasLimpias(wbFcm.Sheets[sheetName], aplicarLimpieza);
+      const rowsSanc = wbSanc ? extraerFilasLimpias(wbSanc.Sheets[wbSanc.SheetNames[0]], aplicarLimpieza) : [];
+      const rowsCobro = wbCobro ? extraerFilasLimpias(wbCobro.Sheets[wbCobro.SheetNames[0]], aplicarLimpieza) : [];
+
+      if (!rowsFcm.length) {
+        return mostrarError(`La hoja "${sheetName}" está vacía.`);
       }
 
-      const ccSanc = new Set(rowsSanc.map(r => normalizarCC(r["Cédula"])).filter(Boolean));
-      const ccCobro = new Set(rowsCobro.map(r => normalizarCC(r["Cédula"])).filter(Boolean));
-      const excluir = new Set([...ccSanc, ...ccCobro]);
+      // Validar que la llave exista en FCM
+      const pruebaLlave = obtenerValorLlave(rowsFcm[0], tipoLlave);
+      if (pruebaLlave === undefined) {
+        return mostrarError(`No se encontró la columna para la llave "${tipoLlave}" en la hoja "${sheetName}".`);
+      }
 
-      resultadoGlobal = rowsFcm.filter(r => {
-        const cc = normalizarCC(r["Identificación"]);
-        return !excluir.has(cc);
-      });
+      if (deduplicar) {
+        const vistos = new Set();
+        rowsFcm = rowsFcm.filter(r => {
+          const k = normalizarLlave(obtenerValorLlave(r, tipoLlave));
+          if (!k || vistos.has(k)) return false;
+          vistos.add(k);
+          return true;
+        });
+      }
 
-      const ccUnicas = new Set(resultadoGlobal.map(r => normalizarCC(r["Identificación"])).filter(Boolean));
+      const setSanc = new Set(rowsSanc.map(r => normalizarLlave(obtenerValorLlave(r, tipoLlave))).filter(Boolean));
+      const setCobro = new Set(rowsCobro.map(r => normalizarLlave(obtenerValorLlave(r, tipoLlave))).filter(Boolean));
+
+      const exclusivos = [];
+      const coincidencias = [];
+      const soloVsSanc = [];
+      const soloVsCobro = [];
+      const consolidado = [];
+
+      for (const r of rowsFcm) {
+        const k = normalizarLlave(obtenerValorLlave(r, tipoLlave));
+        const enSanc = wbSanc ? setSanc.has(k) : false;
+        const enCobro = wbCobro ? setCobro.has(k) : false;
+
+        if (!enSanc && !enCobro) exclusivos.push(r);
+        if (enSanc || enCobro) coincidencias.push(r);
+        if (!enSanc) soloVsSanc.push(r);
+        if (!enCobro) soloVsCobro.push(r);
+
+        consolidado.push({
+          ...r,
+          En_Sanciones: wbSanc ? (enSanc ? "SÍ" : "NO") : "No cargado",
+          En_Cobro_Coactivo: wbCobro ? (enCobro ? "SÍ" : "NO") : "No cargado",
+          Estado_Cruce: (enSanc || enCobro) ? "En pendientes" : "Exclusivo FCM"
+        });
+      }
+
+      reportesCalculados = {
+        exclusivos,
+        coincidencias,
+        solo_vs_sanc: soloVsSanc,
+        solo_vs_cobro: soloVsCobro,
+        consolidado
+      };
+
+      const baseSeleccionada = reportesCalculados[modo] || exclusivos;
+      const filtroTexto = document.getElementById("searchInput").value.trim().toLowerCase();
+
+      vistaActual = filtroTexto
+        ? baseSeleccionada.filter(row => Object.values(row).some(v => String(v).toLowerCase().includes(filtroTexto)))
+        : baseSeleccionada;
 
       document.getElementById("mTotalFcm").textContent = rowsFcm.length;
-      document.getElementById("mSanc").textContent = ccSanc.size;
-      document.getElementById("mCobro").textContent = ccCobro.size;
-      document.getElementById("mExcl").textContent = `${resultadoGlobal.length} filas (${ccUnicas.size} CC)`;
+      document.getElementById("mSanc").textContent = wbSanc ? setSanc.size : "No cargado";
+      document.getElementById("mCobro").textContent = wbCobro ? setCobro.size : "No cargado";
+      document.getElementById("mResult").textContent = `${vistaActual.length} filas`;
 
-      renderTabla(resultadoGlobal);
+      renderTabla(vistaActual);
       document.getElementById("resultsBox").style.display = "block";
     }
 
     function renderTabla(rows) {
       const table = document.getElementById("previewTable");
       if (!rows.length) {
-        table.innerHTML = "<tr><td>Sin registros exclusivos en FCM.</td></tr>";
+        table.innerHTML = "<tr><td style='padding:1rem;color:#9ca3af;'>No hay registros que coincidan con este filtro o cruce.</td></tr>";
         return;
       }
       const cols = Object.keys(rows[0]);
       const thead = `<thead><tr>${cols.map(c => `<th>${c}</th>`).join("")}</tr></thead>`;
-      const tbody = `<tbody>${rows.map(r => `<tr>${cols.map(c => {
-        let v = r[c];
-        if (v instanceof Date) v = v.toISOString().split("T")[0];
-        return `<td>${v ?? ""}</td>`;
-      }).join("")}</tr>`).join("")}</tbody>`;
+      const tbody = `<tbody>${rows.map(r => `<tr>${cols.map(c => `<td>${r[c] ?? ""}</td>`).join("")}</tr>`).join("")}</tbody>`;
       table.innerHTML = thead + tbody;
     }
 
+    // Eventos de carga
     document.getElementById("fcmFile").addEventListener("change", async (e) => {
-      if (!e.target.files[0]) return;
-      wbFcm = await leerWorkbook(e.target.files[0]);
+      const file = e.target.files[0];
+      if (!file) return;
+      wbFcm = await leerWorkbook(file);
       const sel = document.getElementById("sheetSelect");
       sel.innerHTML = wbFcm.SheetNames.map(s => `<option value="${s}" ${s === "MANDAMIENTO" ? "selected" : ""}>${s}</option>`).join("");
-      document.getElementById("sheetSelectorBox").style.display = "block";
-      ejecutarCruce();
+      document.getElementById("controlsPanel").style.display = "block";
+      const badge = document.getElementById("statusFcm");
+      badge.textContent = "Cargado";
+      badge.className = "badge badge-loaded";
+      procesarTodo();
     });
 
     document.getElementById("sancFile").addEventListener("change", async (e) => {
-      if (!e.target.files[0]) return;
-      wbSanc = await leerWorkbook(e.target.files[0]);
-      ejecutarCruce();
+      const file = e.target.files[0];
+      if (!file) return;
+      wbSanc = await leerWorkbook(file);
+      const badge = document.getElementById("statusSanc");
+      badge.textContent = "Cargado";
+      badge.className = "badge badge-loaded";
+      procesarTodo();
     });
 
     document.getElementById("cobroFile").addEventListener("change", async (e) => {
-      if (!e.target.files[0]) return;
-      wbCobro = await leerWorkbook(e.target.files[0]);
-      ejecutarCruce();
+      const file = e.target.files[0];
+      if (!file) return;
+      wbCobro = await leerWorkbook(file);
+      const badge = document.getElementById("statusCobro");
+      badge.textContent = "Cargado";
+      badge.className = "badge badge-loaded";
+      procesarTodo();
     });
 
-    document.getElementById("sheetSelect").addEventListener("change", ejecutarCruce);
+    document.getElementById("clearSecondaryBtn").addEventListener("click", () => {
+      wbSanc = null;
+      wbCobro = null;
+      document.getElementById("sancFile").value = "";
+      document.getElementById("cobroFile").value = "";
+      document.getElementById("statusSanc").textContent = "Opcional";
+      document.getElementById("statusSanc").className = "badge badge-opt";
+      document.getElementById("statusCobro").textContent = "Opcional";
+      document.getElementById("statusCobro").className = "badge badge-opt";
+      procesarTodo();
+    });
 
+    ["sheetSelect", "keySelect", "modeSelect", "chkCleanData", "chkDedup"].forEach(id => {
+      document.getElementById(id).addEventListener("change", procesarTodo);
+    });
+    document.getElementById("searchInput").addEventListener("input", procesarTodo);
+
+    // Descarga reporte actual
     document.getElementById("downloadBtn").addEventListener("click", () => {
-      const ws = XLSX.utils.json_to_sheet(resultadoGlobal);
+      const modo = document.getElementById("modeSelect").value;
+      const ws = XLSX.utils.json_to_sheet(vistaActual);
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "SOLO_EN_FCM");
-      XLSX.writeFile(wb, "fcm_no_en_pendientes.xlsx");
+      XLSX.utils.book_append_sheet(wb, ws, modo.toUpperCase().slice(0, 31));
+      XLSX.writeFile(wb, `reporte_${modo}_fcm.xlsx`);
+    });
+
+    // Descarga multi-hoja con todos los cruces limpios
+    document.getElementById("downloadMultiBtn").addEventListener("click", () => {
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(reportesCalculados.exclusivos || []), "EXCLUSIVOS_FCM");
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(reportesCalculados.coincidencias || []), "COINCIDENCIAS");
+      if (wbSanc) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(reportesCalculados.solo_vs_sanc || []), "NO_EN_SANCIONES");
+      if (wbCobro) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(reportesCalculados.solo_vs_cobro || []), "NO_EN_COBRO");
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(reportesCalculados.consolidado || []), "CONSOLIDADO_LIMPIO");
+      XLSX.writeFile(wb, "reporte_completo_contractus.xlsx");
     });
   </script>
 </body>
